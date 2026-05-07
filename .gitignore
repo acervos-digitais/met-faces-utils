@@ -1,0 +1,6 @@
+.DS*
+__pycache__/
+env.py
+*.pyc
+*.pyc.*
+*.py.*
