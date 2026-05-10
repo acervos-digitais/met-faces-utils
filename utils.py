@@ -22,18 +22,52 @@ def export_combined_jsons(input_json_dir, output_json_dir, filename, filter_keys
     json.dump({ filename : combined_data }, ofp)
 
 
-def pxs_to_pcts(boxes, img_w, img_h):
-  xywhn = []
-  xyxyn = []
-  for x0,y0,x1,y1 in boxes:
-    xywhn.append([x0/img_w, y0/img_h, (x1-x0)/img_w, (y1-y0)/img_h])
-    xyxyn.append([x0/img_w, y0/img_h, x1/img_w, y1/img_h])
-  return (np.array(xywhn), np.array(xyxyn))
+def px_to_pct(box, img_w, img_h, xyxy=True):
+  x0,y0,x1,y1 = box
+  if xyxy:
+    return [x0 / img_w, y0 / img_h, x1 / img_w, y1 / img_h]
+  else:
+    return [x0 / img_w, y0 / img_h, (x1 - x0) / img_w, (y1 - y0) / img_h]
+
+
+def pxs_to_pcts(boxes, img_w, img_h, xyxy=True):
+  return np.array([px_to_pct(box, img_w, img_h, xyxy) for box in boxes])
 
 
 def pct_to_px(box, img_w, img_h):
   x0,y0,x1,y1 = box
   return [int(x0 * img_w), int(y0 * img_h), int(x1 * img_w), int(y1 * img_h)]
+
+def pcts_to_pxs(boxes, img_w, img_h):
+  return np.array([pct_to_px(box, img_w, img_h) for box in boxes])
+
+
+def pct_to_sq(box, img_w, img_h, xyxy=True):
+  x0,y0,x1,y1 = box
+
+  if xyxy:
+    wpx = (x1 - x0) * img_w
+    hpx = (y1 - y0) * img_h
+  else:
+    wpx = x1 * img_w
+    hpx = y1 * img_h
+
+  dim_px = 1.1 * max(wpx, hpx)
+  dim_x_2 = (dim_px / img_w) / 2
+  dim_y_2 = (dim_px / img_h) / 2
+
+  cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+  cx = min(max(cx, dim_x_2), 1 - dim_x_2)
+  cy = min(max(cy, dim_y_2), 1 - dim_y_2)
+
+  if xyxy:
+    return [cx - dim_x_2, cy - dim_y_2, cx + dim_x_2, cy + dim_y_2]
+  else:
+    return [cx - dim_x_2, cy - dim_y_2, 2 * dim_x_2, 2 * dim_y_2]
+
+
+def pcts_to_sqs(boxes, img_w, img_h, xyxy=True):
+  return np.array([pct_to_sq(box, img_w, img_h, xyxy) for box in boxes])
 
 
 def pct_to_px_sq(box, img_w, img_h):
