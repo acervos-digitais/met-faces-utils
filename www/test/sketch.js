@@ -2,9 +2,7 @@ const DATA_URL = "https://acervos-digitais.github.io/met-faces-data";
 
 const id2obj = {};
 
-let img;
-let oimg;
-let maskGraphics;
+let oimg, dimg, mimg;
 let cObj;
 
 async function preload() {
@@ -41,50 +39,109 @@ function updateImage(evt) {
   oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
-function drawImage() {
-  const minSF = min(width / oimg.width, height / oimg.height);
-  oimg.resize(oimg.width * minSF, oimg.height * minSF);
-  image(oimg, 0, 0);
+function createMasksMask(img, mpObj) {
+  const [iw, ih] = [img.width, img.height];
+  const masks = mpObj["eye_masks"];
 
-  img = createImage(oimg.width, oimg.height);
-  img.copy(oimg, 0, 0, oimg.width, oimg.height, 0, 0, oimg.width, oimg.height);
-
-  const masks = cObj["faces"]["mp"]["masks"];
-
-  maskGraphics = createGraphics(oimg.width, oimg.height);
-  maskGraphics.clear();
-  maskGraphics.fill(255);
-  maskGraphics.noStroke();
+  const pg = createGraphics(iw, ih);
+  pg.clear();
+  pg.fill(255);
+  pg.noStroke();
 
   for (const mask of masks) {
     if (mask.length < 1) continue;
 
-    maskGraphics.beginShape();
-    maskGraphics.curveVertex(mask[0][0] * img.width, mask[0][1] * img.height);
+    pg.beginShape();
 
     for (const point of mask) {
-      maskGraphics.curveVertex(point[0] * img.width, point[1] * img.height);
+      pg.curveVertex(point[0] * iw, point[1] * ih);
     }
 
-    maskGraphics.curveVertex(
-      mask[mask.length - 1][0] * img.width,
-      mask[mask.length - 1][1] * img.height,
-    );
-
-    maskGraphics.endShape(CLOSE);
+    pg.curveVertex(mask[0][0] * iw, mask[0][1] * ih);
+    pg.endShape();
   }
+  return pg;
+}
+
+function createEllipsesMask(img, mpObj) {
+  const [iw, ih] = [img.width, img.height];
+  const centers = mpObj["eye_centers"];
+  const corners = mpObj["eye_corners"];
+  const xu = createVector(1,0);
+
+  const vectorFromPct = (xy) => {
+    return createVector(xy[0] * iw, xy[1] * ih);
+  }
+
+  const eyeWH = (eyeCorner) => {
+    const cL = vectorFromPct(eyeCorner[0], iw, ih);
+    const cR = vectorFromPct(eyeCorner[2], iw, ih);
+    const cT = vectorFromPct(eyeCorner[3], iw, ih);
+    const cB = vectorFromPct(eyeCorner[1], iw, ih);
+    return [ cL.dist(cR), cT.dist(cB) ]
+  }
+
+  const pg = createGraphics(iw, ih);
+  pg.clear();
+  pg.fill(255);
+  pg.noStroke();
+
+  for (let idx = 0; idx < centers.length; idx++) {
+    const center = centers[idx];
+    const corner = corners[idx];
+    if (center[0].length < 1) continue;
+
+    const centerL = vectorFromPct(center[0]);
+    const centerR = vectorFromPct(center[1]);
+    const centerDiff = p5.Vector.sub(centerR, centerL);
+
+    const centerA = xu.angleBetween(centerDiff);
+    const [widthL, heightL] = eyeWH(corner[0]);
+    const [widthR, heightR] = eyeWH(corner[1]);
+    const centerDist = centerL.dist(centerR);
+
+    pg.push();
+    pg.translate(centerL.x, centerL.y);
+    pg.rotate(centerA);
+    pg.ellipse(0, 0, 2.5*widthL, 2.5*heightL);
+    pg.pop();
+    
+    pg.push();
+    pg.translate(centerR.x, centerR.y);
+    pg.rotate(centerA);
+    pg.ellipse(0, 0, 2.5*widthR, 2.5*heightR);
+    pg.pop();
+  }
+
+  return pg;
+}
+
+function drawImage() {
+  const [oiw, oih] = [oimg.width, oimg.height];
+
+  const minSF = min(width / oiw, height / oih);
+  oimg.resize(minSF * oiw, minSF * oih);
+  image(oimg, 0, 0);
+
+  const [niw, nih] = [oimg.width, oimg.height];
+  dimg = createImage(niw, nih);
+  dimg.copy(oimg, 0, 0, niw, nih, 0, 0, niw, nih);
+
+  mimg = createMasksMask(oimg, cObj["faces"]["mp"]);
+  // mimg = createEllipsesMask(oimg, cObj["faces"]["mp"]);
 }
 
 function mouseMoved() {
-  if (!oimg || !img || !maskGraphics) return;
+  if (!oimg || !dimg || !mimg) return;
 
   const inW = mouseX > 20 && mouseX < oimg.width - 20;
   const inH = mouseY > 20 && mouseY < oimg.height - 20;
 
   background(0);
   if (inW && inH) {
-    img.mask(maskGraphics);
-    image(img, 0, 0);
+    dimg.mask(mimg);
+    image(dimg, 0, 0);
+    // image(mimg, 0, 0);
   } else {
     image(oimg, 0, 0);
   }

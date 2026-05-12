@@ -5,7 +5,8 @@ on:
     branches: [ "main" ]
     paths:
       - ".github/workflows/publish-ghpages.yml"
-      - "www"
+      - "www/*"
+      - "www/**/*"
 
 jobs:
   build:
