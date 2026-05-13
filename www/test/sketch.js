@@ -4,17 +4,23 @@ const id2obj = {};
 
 let oimg, dimg, mimg;
 let cObj;
+let styleSel;
 
 async function preload() {
   const res = await fetch(`${DATA_URL}/json/landmarks.json`);
   const resObj = await res.json();
-  setupDropDown(resObj["landmarks"]);
+  setupDropDowns(resObj["landmarks"]);
 }
 
-function setupDropDown(objs) {
-  const mySelect = createSelect();
-  mySelect.position(10, 10);
-  mySelect.changed(updateImage);
+function setupDropDowns(objs) {
+  styleSel = createSelect();
+  styleSel.position(100, 10);
+  styleSel.changed(drawImage);
+  ["landmarks", "ovals"].forEach(option => styleSel.option(option));
+
+  const imgSel = createSelect();
+  imgSel.position(10, 10);
+  imgSel.changed(updateImage);
 
   for (const obj of objs) {
     if (
@@ -22,10 +28,13 @@ function setupDropDown(objs) {
       "mp" in obj["faces"] &&
       obj["faces"]["mp"]["count"] > 0
     ) {
-      mySelect.option(obj["objectID"]);
+      imgSel.option(obj["objectID"]);
       id2obj[obj["objectID"]] = obj;
     }
   }
+
+  cObj = objs[0];
+  oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
 function setup() {
@@ -117,6 +126,7 @@ function createEllipsesMask(img, mpObj) {
 }
 
 function drawImage() {
+  background(0);
   const [oiw, oih] = [oimg.width, oimg.height];
 
   const minSF = min(width / oiw, height / oih);
@@ -127,8 +137,11 @@ function drawImage() {
   dimg = createImage(niw, nih);
   dimg.copy(oimg, 0, 0, niw, nih, 0, 0, niw, nih);
 
-  mimg = createMasksMask(oimg, cObj["faces"]["mp"]);
-  // mimg = createEllipsesMask(oimg, cObj["faces"]["mp"]);
+  if (styleSel.value() == "ovals") {
+    mimg = createEllipsesMask(oimg, cObj["faces"]["mp"]);
+  } else {
+    mimg = createMasksMask(oimg, cObj["faces"]["mp"]);
+  }
 }
 
 function mouseMoved() {
