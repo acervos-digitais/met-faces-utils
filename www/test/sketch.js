@@ -19,14 +19,15 @@ async function preload() {
 }
 
 function extractFaceMasks(faces, definitions) {
-  return faces.map(face => definitions.map(idx => face[idx]));
+  return faces.map(face => face.length < 1 ? [] : definitions.map(idx => face[idx]));
 }
 
 function setupDropDowns(objs) {
   styleSel = createSelect();
   styleSel.position(100, 10);
   styleSel.changed(drawImage);
-  ["EYE_2_M", "EYE_3_M", "EYE_4_M", "EYE_4"].forEach(option => styleSel.option(option));
+  ["EYE_0", "EYE_1", "EYE_2", "EYE_3", "EYE_4",
+   "EYE_2_M", "EYE_3_M", "EYE_4_M"].forEach(option => styleSel.option(option));
 
   const imgSel = createSelect();
   imgSel.position(10, 10);
@@ -58,14 +59,8 @@ function updateImage(evt) {
   oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
-function createMasksMask(img, mpObj, maskName) {
+function drawMasksMask(img, masks, pg) {
   const [iw, ih] = [img.width, img.height];
-  const masks = extractFaceMasks(mpObj["faces"], maskDefinitions[maskName]);
-
-  const pg = createGraphics(iw, ih);
-  pg.clear();
-  pg.fill(255);
-  pg.noStroke();
 
   for (const mask of masks) {
     if (mask.length < 1) continue;
@@ -80,6 +75,26 @@ function createMasksMask(img, mpObj, maskName) {
     pg.curveVertex(mask[0][0] * iw, mask[0][1] * ih);
     pg.endShape();
   }
+}
+
+function createMasksMask(img, mpObj, maskName) {
+  const [iw, ih] = [img.width, img.height];
+
+  const pg = createGraphics(iw, ih);
+  pg.clear();
+  pg.fill(255);
+  pg.noStroke();
+
+  if (maskName in maskDefinitions) {
+    const masks = extractFaceMasks(mpObj["landmarks"], maskDefinitions[maskName]);
+    drawMasksMask(img, masks, pg);
+  } else {
+    ["L", "R"].forEach(side => {
+      const masks = extractFaceMasks(mpObj["landmarks"], maskDefinitions[`${maskName}_${side}`]);
+      drawMasksMask(img, masks, pg);
+    });
+  }
+
   return pg;
 }
 
