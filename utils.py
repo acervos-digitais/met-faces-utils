@@ -60,7 +60,7 @@ def pct_to_sq(box, img_w, img_h, xyxy=True):
     wpx = x1 * img_w
     hpx = y1 * img_h
 
-  dim_px = 1.1 * max(wpx, hpx)
+  dim_px = 1.8 * max(wpx, hpx)
   dim_x_2 = (dim_px / img_w) / 2
   dim_y_2 = (dim_px / img_h) / 2
 
