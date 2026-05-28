@@ -26,8 +26,9 @@ function setupDropDowns(objs) {
   styleSel = createSelect();
   styleSel.position(100, 10);
   styleSel.changed(drawImage);
-  ["EYE_0", "EYE_1", "EYE_2", "EYE_3", "EYE_4",
-   "EYE_2_M", "EYE_3_M", "EYE_4_M"].forEach(option => styleSel.option(option));
+  [ "A1", "A2", "A3", "A4", "A5",
+    "EYE_0", "EYE_1", "EYE_2", "EYE_3", "EYE_4",
+    "EYE_2_M", "EYE_3_M", "EYE_4_M"].forEach(option => styleSel.option(option));
 
   const imgSel = createSelect();
   imgSel.position(10, 10);
