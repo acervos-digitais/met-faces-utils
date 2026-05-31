@@ -26,8 +26,9 @@ function setupDropDowns(objs) {
   styleSel = createSelect();
   styleSel.position(100, 10);
   styleSel.changed(drawImage);
-  [ "A1", "A2", "A3", "A4", "A5",
-    "EYE_0", "EYE_1", "EYE_2", "EYE_3", "EYE_4",
+  [ "A1", "A2", "A2b", "A3", "A4", "A5",
+    "noise",
+    "EYE_0", "EYE_1", "EYE_2", "EYE_2b", "EYE_3", "EYE_4",
     "EYE_2_M", "EYE_3_M", "EYE_4_M"].forEach(option => styleSel.option(option));
 
   const imgSel = createSelect();
@@ -60,25 +61,63 @@ function updateImage(evt) {
   oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
-function drawMasksMask(img, masks, pg) {
+function drawFaceMasks(img, masks, pg) {
   const [iw, ih] = [img.width, img.height];
 
   for (const mask of masks) {
     if (mask.length < 1) continue;
 
-    pg.beginShape();
+    mask.unshift(mask.at(0));
+    mask.push(mask.at(0));
+    mask.push(mask.at(1));
 
-    pg.curveVertex(mask[0][0] * iw, mask[0][1] * ih);
+    pg.beginShape();
     for (const point of mask) {
       pg.curveVertex(point[0] * iw, point[1] * ih);
     }
-
-    pg.curveVertex(mask[0][0] * iw, mask[0][1] * ih);
     pg.endShape();
   }
 }
 
-function createMasksMask(img, mpObj, maskName) {
+function drawNoiseEye(center, radius, pg) {
+  pg.push();
+  pg.translate(center[0], center[1]);
+
+  pg.beginShape();
+  for (let a = 0; a < TWO_PI; a += PI / 100) {
+    const x0 = radius * cos(a);
+    const y0 = radius * sin(a);
+
+    const rr = noise((pg.width + x0) / (3 * radius), (pg.height + y0) / (3 * radius), center[0]);
+
+    vertex(rr * x0, rr * y0);
+  }
+  pg.endShape(CLOSE);
+  pg.pop();
+}
+
+function drawNoiseMasks(img, faces, pg) {
+  const [iw, ih] = [img.width, img.height];
+
+  for (const face of faces) {
+    if (face.length < 1) continue;
+    noiseSeed(1010);
+
+    const lCenter = face[473];
+    const lOuter = face[446];
+    const lRadius = (lOuter[0] - lCenter[0]) * iw;
+    const rCenter = face[468];
+    const rOuter = face[226];
+    const rRadius = (rOuter[0] - rCenter[0]) * iw;
+
+    const lrRadius = 2 * max(lRadius, rRadius);
+
+    drawNoiseEye([lCenter[0] * iw, lCenter[1] * ih], lrRadius, pg);
+    drawNoiseEye([rCenter[0] * iw, rCenter[1] * ih], lrRadius, pg);
+  }
+}
+
+function createMask(img, mpObj, maskName) {
   const [iw, ih] = [img.width, img.height];
 
   const pg = createGraphics(iw, ih);
@@ -86,13 +125,15 @@ function createMasksMask(img, mpObj, maskName) {
   pg.fill(255);
   pg.noStroke();
 
-  if (maskName in maskDefinitions) {
+  if (maskName.toLowerCase().includes("noise")) {
+    drawNoiseMasks(img, mpObj["landmarks"], pg);
+  } else if (maskName in maskDefinitions) {
     const masks = extractFaceMasks(mpObj["landmarks"], maskDefinitions[maskName]);
-    drawMasksMask(img, masks, pg);
+    drawFaceMasks(img, masks, pg);
   } else {
     ["L", "R"].forEach(side => {
       const masks = extractFaceMasks(mpObj["landmarks"], maskDefinitions[`${maskName}_${side}`]);
-      drawMasksMask(img, masks, pg);
+      drawFaceMasks(img, masks, pg);
     });
   }
 
@@ -111,7 +152,7 @@ function drawImage() {
   dimg = createImage(niw, nih);
   dimg.copy(oimg, 0, 0, niw, nih, 0, 0, niw, nih);
 
-  mimg = createMasksMask(oimg, cObj["faces"]["mp"], styleSel.value());
+  mimg = createMask(oimg, cObj["faces"]["mp"], styleSel.value());
 }
 
 function mouseMoved() {
