@@ -29,7 +29,10 @@ function setupDropDowns(objs) {
   [ "A1", "A2", "A2b", "A3", "A4", "A5",
     "noise",
     "EYE_0", "EYE_1", "EYE_2", "EYE_2b", "EYE_3", "EYE_4",
-    "EYE_2_M", "EYE_3_M", "EYE_4_M"].forEach(option => styleSel.option(option));
+    "EYE_2_M", "EYE_3_M", "EYE_4_M"];
+  [ "A2b", "A1", "A4",
+    "EYE_0", "EYE_1", "EYE_2", "EYE_2b",
+    "EYE_2_M", "EYE_3_M"].forEach(option => styleSel.option(option));
 
   const imgSel = createSelect();
   imgSel.position(10, 10);
