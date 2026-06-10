@@ -140,3 +140,9 @@ def crop_with_polygons(img, pointses, detail=4):
     draw.polygon(np.array(polygon).tolist(), fill=255)
   nimg.putalpha(mask)
   return nimg
+
+
+def make_bins(data, bin_range=50):
+  dmin, dmax = min(data), max(data)
+  bins_start, bins_stop = int(dmin//bin_range * bin_range), int((dmax//bin_range + 2) * bin_range)
+  return range(bins_start, bins_stop, bin_range)
