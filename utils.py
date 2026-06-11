@@ -127,18 +127,24 @@ def curve(points,detail=4):
   return curve_points
 
 
-def crop_with_polygons(img, pointses, detail=4):
+def mask_with_polygons(img, pointses, detail=4, scale=1):
+  nimg = img.convert("RGBA")
+  mask = PImage.new("L", nimg.size, 0)
+
+  if scale > 1:
+    pointses = (scale * np.array(pointses)).tolist()
+    mask = PImage.new("L", (scale * nimg.width, scale * nimg.height), 0)
+
   polygons = [
     curve(np.vstack((points, points[:1])), detail=detail)
     for points in pointses
   ]
 
-  nimg = img.convert("RGBA")
-  mask = PImage.new("L", nimg.size, 0)
   draw = PImageDraw.Draw(mask)
   for polygon in polygons:
     draw.polygon(np.array(polygon).tolist(), fill=255)
-  nimg.putalpha(mask)
+
+  nimg.putalpha(mask.resize(nimg.size, resample=PImage.Resampling.BICUBIC))
   return nimg
 
 
