@@ -1,3 +1,6 @@
 [submodule "lehman-data"]
 	path = lehman-data
 	url = git@github.com:acervos-digitais/met-faces-lehman-data.git
+[submodule "data"]
+	path = data
+	url = git@github.com:acervos-digitais/met-faces-data.git
