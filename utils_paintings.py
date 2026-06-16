@@ -60,6 +60,24 @@ class PaintingsUtils:
       mp_ldk_defs = json.load(ifp)
       self.EYES_IDXS = [mp_ldk_defs["A2b_R"], mp_ldk_defs["A2b_L"]]
 
+    try:
+      with open(f"{self.json_dir}/no_imgs.json", "r") as ifp:
+        self.no_imgs = json.load(ifp)
+    except:
+      self.no_imgs = []
+
+    try:
+      with open(f"{self.json_dir}/no_faces.json", "r") as ifp:
+        self.no_faces = json.load(ifp)
+    except:
+      self.no_faces = []
+
+    try:
+      with open(f"{self.json_dir}/no_landmarks.json", "r") as ifp:
+        self.no_landmarks = json.load(ifp)
+    except:
+      self.no_landmarks = []
+
 
   @classmethod
   def get_object_ids(cls):
@@ -118,6 +136,9 @@ class PaintingsUtils:
       self.last_req = timestamp()
 
       if not ("primaryImage" in obj_data and obj_data["primaryImage"].startswith("http")):
+        self.no_imgs.append(obj_data["objectID"])
+        with open(f"{self.json_dir}/no_imgs.json", "w") as ofp:
+          json.dump(self.no_imgs, ofp, ensure_ascii=False)
         return None
 
       obj_filtered_data = { f: obj_data[f] for f in self.OBJ_FIELDS }
@@ -149,14 +170,10 @@ class PaintingsUtils:
 
       faces = self.face_detector.predict(nimg, verbose=False, device="cuda")
       if len(faces) < 1 or len(faces[0]) < 1:
-        obj_data["faces"] = {
-          "yolo": {
-            "count": 0,
-            "xyxyn": [],
-            "xyxyn_sq": [],
-          }
-        }
-        return obj_data
+        self.no_faces.append(oid)
+        with open(f"{self.json_dir}/no_faces.json", "w") as ofp:
+          json.dump(self.no_faces, ofp, ensure_ascii=False)
+        return None
 
       faces_xyxyn = faces[0].boxes.xyxyn.cpu().numpy().astype(np.float64)
       faces_xyxyn_sq = pcts_to_sqs(faces_xyxyn, iw, ih)
@@ -189,10 +206,10 @@ class PaintingsUtils:
       }
 
       if obj_data["faces"]["yolo"]["count"] < 1:
-        obj_data["faces"]["mp"] = mp_results
-        with open(json_landmark_path, "w") as ofp:
-          json.dump(obj_data, ofp, ensure_ascii=False)
-        return obj_data
+        self.no_landmarks.append(oid)
+        with open(f"{self.json_dir}/no_landmarks.json", "w") as ofp:
+          json.dump(self.no_landmarks, ofp, ensure_ascii=False)
+        return None
 
       for fcnt,fbox in enumerate(obj_data["faces"]["yolo"]["xyxyn_sq"]):
         x0,y0,x1,y1 = pct_to_px(fbox, iw, ih)
@@ -215,6 +232,12 @@ class PaintingsUtils:
         mp_results["landmarks"].append(face_landmarks.round(4).tolist())
 
       obj_data["faces"]["mp"] = mp_results
+
+      if obj_data["faces"]["mp"]["count"] < 1:
+        self.no_landmarks.append(oid)
+        with open(f"{self.json_dir}/no_landmarks.json", "w") as ofp:
+          json.dump(self.no_landmarks, ofp, ensure_ascii=False)
+        return None
 
       with open(json_landmark_path, "w") as ofp:
         json.dump(obj_data, ofp, ensure_ascii=False)
