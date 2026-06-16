@@ -24,8 +24,8 @@ jobs:
         git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
         git checkout --orphan gh-pages
         git reset .
-        cp -r www/index.html www/test .
+        cp -r www/index.html www/lehman .
         touch .nojekyll
-        git add .nojekyll index.html test
+        git add .nojekyll index.html lehman
         git commit -m $COMMIT_MSG
         git push -f origin gh-pages

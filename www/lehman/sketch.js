@@ -1,4 +1,5 @@
 const DATA_URL = "https://acervos-digitais.github.io/met-faces-data";
+const LDATA_URL = "https://acervos-digitais.github.io/met-faces-lehman-data";
 
 const id2obj = {};
 const maskDefinitions = {};
@@ -8,7 +9,7 @@ let cObj;
 let styleSel;
 
 async function preload() {
-  const landmarkRes = await fetch(`${DATA_URL}/json/landmarks.json`);
+  const landmarkRes = await fetch(`${LDATA_URL}/json/landmarks.json`);
   const landmarksObj = await landmarkRes.json();
 
   const masksRes = await fetch(`${DATA_URL}/json/mp_masks_definitions.json`);
@@ -50,7 +51,7 @@ function setupDropDowns(objs) {
   }
 
   cObj = objs[0];
-  oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
+  oimg = loadImage(`${LDATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
 function setup() {
@@ -61,7 +62,7 @@ function setup() {
 function updateImage(evt) {
   background(0);
   cObj = id2obj[evt.target.value];
-  oimg = loadImage(`${DATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
+  oimg = loadImage(`${LDATA_URL}/image/500/${cObj["objectID"]}.jpg`, drawImage);
 }
 
 function drawFaceMasks(img, masks, pg) {
