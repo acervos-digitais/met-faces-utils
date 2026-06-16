@@ -2,21 +2,25 @@ import json
 import numpy as np
 import requests
 
-from os import makedirs
+from os import makedirs, path
 from time import sleep, time as timestamp
 
-from huggingface_hub import hf_hub_download
+try:
+  from huggingface_hub import hf_hub_download
 
-from mediapipe import Image as mpImage, ImageFormat as mpImageFormat
-from mediapipe.tasks.python.core.base_options import BaseOptions as mpBaseOptions
-from mediapipe.tasks.python.vision import FaceDetector as mpFaceDetector, FaceLandmarker as mpFaceLandmarker
-from mediapipe.tasks.python.vision import FaceDetectorOptions as mpFaceDetectorOptions
-from mediapipe.tasks.python.vision import FaceLandmarkerOptions as mpFaceLandmarkerOptions
-from mediapipe.tasks.python.vision import RunningMode as mpRunningMode
+  from mediapipe import Image as mpImage, ImageFormat as mpImageFormat
+  from mediapipe.tasks.python.core.base_options import BaseOptions as mpBaseOptions
+  from mediapipe.tasks.python.vision import FaceDetector as mpFaceDetector, FaceLandmarker as mpFaceLandmarker
+  from mediapipe.tasks.python.vision import FaceDetectorOptions as mpFaceDetectorOptions
+  from mediapipe.tasks.python.vision import FaceLandmarkerOptions as mpFaceLandmarkerOptions
+  from mediapipe.tasks.python.vision import RunningMode as mpRunningMode
 
-from ultralytics import YOLO
+  from ultralytics import YOLO
+except:
+  pass
 
 from utils import pxs_to_pcts, pcts_to_sqs, pct_to_px
+from utils import mask_with_polygons
 
 class PaintingsUtils:
   MET_URL = "https://collectionapi.metmuseum.org/public/collection/v1"
@@ -37,14 +41,6 @@ class PaintingsUtils:
     "dimensions"
   ]
 
-  landmarker_model_path = "./face_landmarker.task"
-
-  landmarker_options = mpFaceLandmarkerOptions(
-    base_options=mpBaseOptions(model_asset_path=landmarker_model_path),
-    running_mode=mpRunningMode.IMAGE
-  )
-
-
   def __init__(self, json_dir, image_dir):
     self.image_dir = image_dir
     self.json_dir = json_dir
@@ -58,9 +54,6 @@ class PaintingsUtils:
     makedirs(self.json_landmarks_dir, exist_ok=True)
     makedirs(self.image_eyes_dir, exist_ok=True)
 
-    yolo_model_path = hf_hub_download(repo_id="AdamCodd/YOLOv11n-face-detection", filename="model.pt")
-    self.face_detector = YOLO(yolo_model_path)
-    self.face_landmarker = mpFaceLandmarker.create_from_options(self.landmarker_options)
     self.last_req = int(timestamp())
 
     with open(f"{self.json_dir}/mp_masks_definitions.json", "r") as ifp:
@@ -74,8 +67,23 @@ class PaintingsUtils:
     return sorted(list(set(response.json()["objectIDs"])))
 
 
-  @classmethod
-  def get_measurement(cls, obj_data):
+  def init_face_detector(self):
+    yolo_model_path = hf_hub_download(repo_id="AdamCodd/YOLOv11n-face-detection", filename="model.pt")
+    self.face_detector = YOLO(yolo_model_path)
+
+
+  def init_face_landmarker(self):
+    landmarker_model_path = "./face_landmarker.task"
+
+    landmarker_options = mpFaceLandmarkerOptions(
+      base_options=mpBaseOptions(model_asset_path=landmarker_model_path),
+      running_mode=mpRunningMode.IMAGE
+    )
+
+    self.face_landmarker = mpFaceLandmarker.create_from_options(landmarker_options)
+
+
+  def get_measurement(obj_data):
     if "measurements" in obj_data and obj_data["measurements"] and len(obj_data["measurements"]) > 0:
       img_meas = [m["elementMeasurements"] for m in obj_data["measurements"] if m["elementName"] == "Image"]
       ovr_meas = [m["elementMeasurements"] for m in obj_data["measurements"] if m["elementName"] == "Overall"]
