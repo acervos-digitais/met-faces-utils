@@ -3,7 +3,7 @@ import numpy as np
 import requests
 
 from os import makedirs
-from time import sleep
+from time import sleep, time as timestamp
 
 from huggingface_hub import hf_hub_download
 
@@ -45,18 +45,27 @@ class PaintingsUtils:
   )
 
 
-  def __init__(self, json_objs_dir, json_faces_dir, json_landmarks_dir):
-    makedirs(json_objs_dir, exist_ok=True)
-    makedirs(json_faces_dir, exist_ok=True)
-    makedirs(json_landmarks_dir, exist_ok=True)
+  def __init__(self, json_dir, image_dir):
+    self.image_dir = image_dir
+    self.json_dir = json_dir
+    self.json_objs_dir = f"{json_dir}/objects"
+    self.json_faces_dir = f"{json_dir}/faces"
+    self.json_landmarks_dir = f"{json_dir}/landmarks"
+    self.image_eyes_dir = f"{image_dir}/eyes"
 
-    self.json_objs_dir = json_objs_dir
-    self.json_faces_dir = json_faces_dir
-    self.json_landmarks_dir = json_landmarks_dir
+    makedirs(self.json_objs_dir, exist_ok=True)
+    makedirs(self.json_faces_dir, exist_ok=True)
+    makedirs(self.json_landmarks_dir, exist_ok=True)
+    makedirs(self.image_eyes_dir, exist_ok=True)
 
     yolo_model_path = hf_hub_download(repo_id="AdamCodd/YOLOv11n-face-detection", filename="model.pt")
     self.face_detector = YOLO(yolo_model_path)
     self.face_landmarker = mpFaceLandmarker.create_from_options(self.landmarker_options)
+    self.last_req = int(timestamp())
+
+    with open(f"{self.json_dir}/mp_masks_definitions.json", "r") as ifp:
+      mp_ldk_defs = json.load(ifp)
+      self.EYES_IDXS = [mp_ldk_defs["A2b_R"], mp_ldk_defs["A2b_L"]]
 
 
   @classmethod
@@ -93,9 +102,12 @@ class PaintingsUtils:
       with open(json_obj_path, "r") as ifp:
         return json.load(ifp)
     except FileNotFoundError:
+      tdiff = timestamp() - self.last_req
+      if tdiff < 0.75:
+        sleep(0.75 - tdiff)
       obj_response = requests.get(f"{self.MET_URL}/objects/{oid}")
       obj_data = obj_response.json()
-      sleep(0.25)
+      self.last_req = timestamp()
 
       if not ("primaryImage" in obj_data and obj_data["primaryImage"].startswith("http")):
         return None
@@ -200,3 +212,35 @@ class PaintingsUtils:
         json.dump(obj_data, ofp, ensure_ascii=False)
         return obj_data
 
+
+  def get_eye_images(self, obj_data, img):
+    oid = obj_data["objectID"]
+    iw,ih = img.size
+
+    if not ("faces" in obj_data and "mp" in obj_data["faces"] and obj_data["faces"]["mp"]["count"] > 0):
+      return
+
+    for fcnt,landmarks in enumerate(obj_data["faces"]["mp"]["landmarks"]):
+      if len(landmarks) < 1:
+        continue
+
+      face_cnt_str = f"000{fcnt}"[-3:]
+      img_path = f"{self.image_eyes_dir}/{oid}_{face_cnt_str}.avif"
+      if path.isfile(img_path):
+        continue
+
+      landmarks_np = np.array(landmarks) * img.size
+      pair_points = [landmarks_np[eye_idxs].tolist() for eye_idxs in self.EYES_IDXS]
+
+      pair_points_np = np.array(pair_points).reshape(-1, 2)
+      minx, miny = (pair_points_np.min(axis=0)).tolist()
+      maxx, maxy = (pair_points_np.max(axis=0)).tolist()
+      cx, cy = (maxx + minx) / 2, (maxy + miny) / 2
+      sx, sy = maxx - minx, maxy - miny
+      w_2, h_2 = 1.25 * (maxx - minx) / 2, 1.25 * (maxy - miny) / 2
+
+      scale = 2 if h_2 > 200 else (4 if h_2 > 100 else 8)
+      mimg = mask_with_polygons(img, pair_points, detail=32, scale=scale)
+
+      pair_img = mimg.crop((cx - w_2, cy - h_2, cx + w_2, cy + h_2))
+      pair_img.save(img_path)

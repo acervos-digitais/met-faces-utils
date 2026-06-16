@@ -12,20 +12,32 @@ def get_masks_definitions():
   return mask_definitions
 
 
-def export_combined_jsons(input_json_dir, output_json_dir, filename, filter_keys=None):
+def get_combined_jsons(input_json_dir, obj_filter=None):
   json_files = sorted(f for f in listdir(input_json_dir) if f.endswith("json"))
   combined_data = []
-  for jf in json_files:
-    if filter_keys is None:
-      with open(f"{input_json_dir}/{jf}", "r") as ifp:
-        combined_data.append(json.load(ifp))
-    else:
-      with open(f"{input_json_dir}/{jf}", "r") as ifp:
-        json_data = json.load(ifp)
-        json_keys = set(json_data.keys())
-        if len(json_keys.intersection(set(filter_keys))) > 0:
-          combined_data.append(json_data)
 
+  if type(obj_filter) == str:
+    obj_filter = [obj_filter]
+
+  for jf in json_files:
+    with open(f"{input_json_dir}/{jf}", "r") as ifp:
+      json_data = json.load(ifp)
+
+      if type(obj_filter) == list:
+        json_keys = set(json_data.keys())
+        if len(json_keys.intersection(set(obj_filter))) > 0:
+          combined_data.append(json_data)
+      elif callable(obj_filter):
+        if obj_filter(json_data):
+          combined_data.append(json_data)
+      else:
+        combined_data.append(json_data)
+
+  return combined_data
+
+
+def export_combined_jsons(input_json_dir, output_json_dir, filename, obj_filter=None):
+  combined_data = get_combined_jsons(input_json_dir, obj_filter=None)
   with open(f"{output_json_dir}/{filename}.json", "w") as ofp:
     json.dump({ filename : combined_data }, ofp)
 
