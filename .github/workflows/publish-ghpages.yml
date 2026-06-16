@@ -26,6 +26,6 @@ jobs:
         git reset .
         cp -r www/index.html www/lehman .
         touch .nojekyll
-        git add .nojekyll index.html lehman
+        git add .nojekyll index.html lehman json
         git commit -m $COMMIT_MSG
         git push -f origin gh-pages

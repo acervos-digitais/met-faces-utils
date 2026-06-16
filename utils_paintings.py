@@ -20,7 +20,7 @@ except:
   pass
 
 from utils import pxs_to_pcts, pcts_to_sqs, pct_to_px
-from utils import mask_with_polygons
+from utils import get_masks_definitions, mask_with_polygons
 
 class PaintingsUtils:
   MET_URL = "https://collectionapi.metmuseum.org/public/collection/v1"
@@ -56,9 +56,8 @@ class PaintingsUtils:
 
     self.last_req = int(timestamp())
 
-    with open(f"{self.json_dir}/mp_masks_definitions.json", "r") as ifp:
-      mp_ldk_defs = json.load(ifp)
-      self.EYES_IDXS = [mp_ldk_defs["A2b_R"], mp_ldk_defs["A2b_L"]]
+    mp_ldk_defs = get_masks_definitions()
+    self.EYES_IDXS = [mp_ldk_defs["A2b_R"], mp_ldk_defs["A2b_L"]]
 
     try:
       with open(f"{self.json_dir}/no_imgs.json", "r") as ifp:

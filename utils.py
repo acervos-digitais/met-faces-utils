@@ -7,7 +7,7 @@ from PIL import Image as PImage, ImageDraw as PImageDraw
 
 def get_masks_definitions():
   mask_definitions = {}
-  with open("./data/json/mp_masks_definitions.json", "r") as ifp:
+  with open("./json/mp_masks_definitions.json", "r") as ifp:
     mask_definitions = json.load(ifp)
   return mask_definitions
 

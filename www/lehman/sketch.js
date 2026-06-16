@@ -1,4 +1,4 @@
-const DATA_URL = "https://acervos-digitais.github.io/met-faces-data";
+const DATA_URL = "https://acervos-digitais.github.io/met-faces-utils";
 const LDATA_URL = "https://acervos-digitais.github.io/met-faces-lehman-data";
 
 const id2obj = {};
