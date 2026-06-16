@@ -3,6 +3,7 @@ import numpy as np
 import requests
 
 from os import makedirs, path
+from PIL import Image as PImage
 from time import sleep, time as timestamp
 
 try:
@@ -50,8 +51,6 @@ class PaintingsUtils:
     self.image_eyes_dir = f"{image_dir}/eyes"
 
     makedirs(self.json_objs_dir, exist_ok=True)
-    makedirs(self.json_faces_dir, exist_ok=True)
-    makedirs(self.json_landmarks_dir, exist_ok=True)
     makedirs(self.image_eyes_dir, exist_ok=True)
 
     self.last_req = int(timestamp())
@@ -85,11 +84,15 @@ class PaintingsUtils:
 
 
   def init_face_detector(self):
+    makedirs(self.json_faces_dir, exist_ok=True)
+
     yolo_model_path = hf_hub_download(repo_id="AdamCodd/YOLOv11n-face-detection", filename="model.pt")
     self.face_detector = YOLO(yolo_model_path)
 
 
   def init_face_landmarker(self):
+    makedirs(self.json_landmarks_dir, exist_ok=True)
+
     landmarker_model_path = "./face_landmarker.task"
 
     landmarker_options = mpFaceLandmarkerOptions(
@@ -122,6 +125,9 @@ class PaintingsUtils:
 
 
   def get_obj_data(self, oid):
+    if oid in self.no_imgs:
+      return None
+
     json_obj_path = f"{self.json_objs_dir}/{oid}.json"
     try:
       with open(json_obj_path, "r") as ifp:
@@ -130,12 +136,13 @@ class PaintingsUtils:
       tdiff = timestamp() - self.last_req
       if tdiff < 0.75:
         sleep(0.75 - tdiff)
+
       obj_response = requests.get(f"{self.MET_URL}/objects/{oid}")
       obj_data = obj_response.json()
       self.last_req = timestamp()
 
       if not ("primaryImage" in obj_data and obj_data["primaryImage"].startswith("http")):
-        self.no_imgs.append(obj_data["objectID"])
+        self.no_imgs.append(oid)
         with open(f"{self.json_dir}/no_imgs.json", "w") as ofp:
           json.dump(self.no_imgs, ofp, ensure_ascii=False)
         return None
@@ -155,8 +162,12 @@ class PaintingsUtils:
 
 
   def get_face_data(self, obj_data, img):
-    obj_data = json.loads(json.dumps(obj_data))
     oid = obj_data["objectID"]
+
+    if oid in self.no_imgs or oid in self.no_faces:
+      return None
+
+    obj_data = json.loads(json.dumps(obj_data))
     json_face_path = f"{self.json_faces_dir}/{oid}.json"
     try:
       with open(json_face_path, "r") as ifp:
@@ -191,8 +202,12 @@ class PaintingsUtils:
 
 
   def get_landmark_data(self, obj_data, img):
-    obj_data = json.loads(json.dumps(obj_data))
     oid = obj_data["objectID"]
+
+    if oid in self.no_imgs or oid in self.no_faces or oid in self.no_landmarks:
+      return None
+
+    obj_data = json.loads(json.dumps(obj_data))
     json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
     try:
       with open(json_landmark_path, "r") as ifp:
@@ -241,6 +256,20 @@ class PaintingsUtils:
       with open(json_landmark_path, "w") as ofp:
         json.dump(obj_data, ofp, ensure_ascii=False)
         return obj_data
+
+
+  def get_image(self, img_url):
+    tdiff = timestamp() - self.last_req
+    if tdiff < 0.75:
+      sleep(0.75 - tdiff)
+
+    img_response = requests.get(img_url, stream=True)
+    self.last_req = timestamp()
+
+    if img_response.status_code > 399 or img_response.status_code < 200:
+      return None
+    else:
+      return PImage.open(img_response.raw)
 
 
   def get_eye_images(self, obj_data, img):
