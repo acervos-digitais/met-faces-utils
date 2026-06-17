@@ -2,7 +2,7 @@ import json
 import numpy as np
 import requests
 
-from os import makedirs, path
+from os import listdir, makedirs, path
 from PIL import Image as PImage
 from time import sleep, time as timestamp
 
@@ -165,18 +165,47 @@ class PaintingsUtils:
         return obj_filtered_data
 
 
+  def is_done(self, obj_data):
+    oid = obj_data["objectID"]
+    json_face_path = f"{self.json_faces_dir}/{oid}.json"
+    json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
+
+    # Haven't run face detection
+    if not (path.isfile(json_face_path) or oid in self.no_faces):
+      return False
+
+    # Haven't run landmarks
+    if not (path.isfile(json_landmark_path) or oid in self.no_landmarks):
+      return False
+
+    # Have run, but there are no faces nor landmarks
+    if oid in self.no_faces or oid in self.no_landmarks:
+      return True
+
+    # Have landmarks, but not all images
+    if path.isfile(json_landmark_path):
+      with open(json_landmark_path, "r") as ifp:
+        landmark_data = json.load(ifp)["faces"]["mp"]
+
+      img_files = [f for f in listdir(self.image_eyes_dir) if f.startswith(f"{oid}_")]
+      return len(img_files) >= landmark_data["count"]
+
+    # Have run face detection, have run landmarking, have image files
+    return True
+
+
   def get_face_data(self, obj_data, img):
     oid = obj_data["objectID"]
+    json_face_path = f"{self.json_faces_dir}/{oid}.json"
 
     if oid in self.no_imgs or oid in self.no_faces:
       return None
 
-    obj_data = json.loads(json.dumps(obj_data))
-    json_face_path = f"{self.json_faces_dir}/{oid}.json"
     try:
       with open(json_face_path, "r") as ifp:
         return json.load(ifp)
     except FileNotFoundError:
+      obj_data = json.loads(json.dumps(obj_data))
       iw,ih = img.size
       nh = 256
       nw = int(nh * iw // ih)
@@ -207,16 +236,16 @@ class PaintingsUtils:
 
   def get_landmark_data(self, obj_data, img):
     oid = obj_data["objectID"]
+    json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
 
     if oid in self.no_imgs or oid in self.no_faces or oid in self.no_landmarks:
       return None
 
-    obj_data = json.loads(json.dumps(obj_data))
-    json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
     try:
       with open(json_landmark_path, "r") as ifp:
         return json.load(ifp)
     except FileNotFoundError:
+      obj_data = json.loads(json.dumps(obj_data))
       iw,ih = img.size
       mp_results = {
         "count": 0,
