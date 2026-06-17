@@ -137,7 +137,11 @@ class PaintingsUtils:
       if tdiff < 0.75:
         sleep(0.75 - tdiff)
 
-      obj_response = requests.get(f"{self.MET_URL}/objects/{oid}")
+      try:
+        obj_response = requests.get(f"{self.MET_URL}/objects/{oid}", timeout=16)
+      except requests.exceptions.Timeout:
+        return None
+
       obj_data = obj_response.json()
       self.last_req = timestamp()
 
