@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import pandas as pd
 import requests
 
 from os import listdir, makedirs, path
@@ -22,6 +23,7 @@ except:
 
 from utils import pxs_to_pcts, pcts_to_sqs, pct_to_px
 from utils import get_masks_definitions, mask_with_polygons
+from utils import get_combined_jsons
 
 class PaintingsUtils:
   MET_URL = "https://collectionapi.metmuseum.org/public/collection/v1"
@@ -40,6 +42,20 @@ class PaintingsUtils:
     "objectEndDate",
     "medium",
     "dimensions"
+  ]
+
+  CSV_FIELDS = [
+    "objectID",
+    "accessionNumber",
+    "artistDisplayName",
+    "title",
+    "objectDate",
+    "medium",
+    "dimensions",
+    "measurements.Height",
+    "measurements.Width",
+    "department",
+    "primaryImage",
   ]
 
   def __init__(self, json_dir, image_dir, with_detectors=False):
@@ -85,6 +101,13 @@ class PaintingsUtils:
   def get_object_ids(cls):
     response = requests.get(f"{cls.MET_URL}/search?medium=Paintings&hasImages=true&q=*")
     return sorted(list(set(response.json()["objectIDs"])))
+
+
+  @classmethod
+  def export_csv(cls, json_dir, csv_path):
+    objs = get_combined_jsons(json_dir)
+    objs_df = pd.json_normalize(objs)[cls.KEEP_COLS]
+    objs_df.to_csv(csv_path, index=False)
 
 
   def init_face_detector(self):
