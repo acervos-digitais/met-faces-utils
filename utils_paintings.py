@@ -42,7 +42,7 @@ class PaintingsUtils:
     "dimensions"
   ]
 
-  def __init__(self, json_dir, image_dir):
+  def __init__(self, json_dir, image_dir, with_detectors=False):
     self.image_dir = image_dir
     self.json_dir = json_dir
     self.json_objs_dir = f"{json_dir}/objects"
@@ -75,6 +75,10 @@ class PaintingsUtils:
         self.no_landmarks = json.load(ifp)
     except:
       self.no_landmarks = []
+
+    if with_detectors:
+      self.init_face_detector()
+      self.init_face_landmarker()
 
 
   @classmethod
@@ -170,17 +174,17 @@ class PaintingsUtils:
     json_face_path = f"{self.json_faces_dir}/{oid}.json"
     json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
 
-    # Haven't run face detection
-    if not (path.isfile(json_face_path) or oid in self.no_faces):
-      return False
-
-    # Haven't run landmarks
-    if not (path.isfile(json_landmark_path) or oid in self.no_landmarks):
-      return False
-
     # Have run, but there are no faces nor landmarks
     if oid in self.no_faces or oid in self.no_landmarks:
       return True
+
+    # Haven't run face detection
+    if not path.isfile(json_face_path):
+      return False
+
+    # Haven't run landmarks
+    if not path.isfile(json_landmark_path):
+      return False
 
     # Have landmarks, but not all images
     if path.isfile(json_landmark_path):
