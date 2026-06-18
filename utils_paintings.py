@@ -233,6 +233,7 @@ class PaintingsUtils:
         return json.load(ifp)
     except FileNotFoundError:
       obj_data = json.loads(json.dumps(obj_data))
+      obj_data["img_ratio"] = round(img.width / img.height, 6)
       iw,ih = img.size
       nh = 256
       nw = int(nh * iw // ih)
