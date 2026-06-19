@@ -4,7 +4,7 @@ import pandas as pd
 import requests
 
 from os import listdir, makedirs, path
-from PIL import Image as PImage
+from PIL import Image as PImage, ImageStat as PImageStat
 from time import sleep, time as timestamp
 
 try:
@@ -58,6 +58,8 @@ class PaintingsUtils:
     "primaryImage",
   ]
 
+  last_req = int(timestamp())
+
   def __init__(self, json_dir, image_dir, with_detectors=False):
     self.image_dir = image_dir
     self.json_dir = json_dir
@@ -68,8 +70,6 @@ class PaintingsUtils:
 
     makedirs(self.json_objs_dir, exist_ok=True)
     makedirs(self.image_eyes_dir, exist_ok=True)
-
-    self.last_req = int(timestamp())
 
     mp_ldk_defs = get_masks_definitions()
     self.EYES_IDXS = [mp_ldk_defs["A2b_R"], mp_ldk_defs["A2b_L"]]
@@ -93,32 +93,15 @@ class PaintingsUtils:
       self.no_landmarks = []
 
     if with_detectors:
-      self.init_face_detector()
-      self.init_face_landmarker()
+      self.init_detectors()
 
 
-  @classmethod
-  def get_object_ids(cls):
-    response = requests.get(f"{cls.MET_URL}/search?medium=Paintings&hasImages=true&q=*")
-    return sorted(list(set(response.json()["objectIDs"])))
-
-
-  @classmethod
-  def export_csv(cls, json_dir, csv_path):
-    objs = get_combined_jsons(json_dir)
-    objs_df = pd.json_normalize(objs)[cls.KEEP_COLS]
-    objs_df.to_csv(csv_path, index=False)
-
-
-  def init_face_detector(self):
+  def init_detectors(self):
     makedirs(self.json_faces_dir, exist_ok=True)
+    makedirs(self.json_landmarks_dir, exist_ok=True)
 
     yolo_model_path = hf_hub_download(repo_id="AdamCodd/YOLOv11n-face-detection", filename="model.pt")
     self.face_detector = YOLO(yolo_model_path)
-
-
-  def init_face_landmarker(self):
-    makedirs(self.json_landmarks_dir, exist_ok=True)
 
     landmarker_model_path = "./face_landmarker.task"
 
@@ -130,7 +113,36 @@ class PaintingsUtils:
     self.face_landmarker = mpFaceLandmarker.create_from_options(landmarker_options)
 
 
-  def get_measurement(obj_data):
+  @classmethod
+  def get_object_ids(cls):
+    response = requests.get(f"{cls.MET_URL}/search?medium=Paintings&hasImages=true&q=*")
+    return sorted(list(set(response.json()["objectIDs"])))
+
+
+  @classmethod
+  def export_csv(cls, json_dir, csv_path):
+    objs = get_combined_jsons(json_dir)
+    objs_df = pd.json_normalize(objs)[cls.CSV_FIELDS]
+    objs_df.to_csv(csv_path, index=False)
+
+
+  @classmethod
+  def get_image(cls, img_url):
+    tdiff = timestamp() - cls.last_req
+    if tdiff < 0.75:
+      sleep(0.75 - tdiff)
+
+    img_response = requests.get(img_url, stream=True)
+    cls.last_req = timestamp()
+
+    if img_response.status_code > 399 or img_response.status_code < 200:
+      return None
+    else:
+      return PImage.open(img_response.raw)
+
+
+  @classmethod
+  def get_measurement(cls, obj_data):
     if "measurements" in obj_data and obj_data["measurements"] and len(obj_data["measurements"]) > 0:
       img_meas = [m["elementMeasurements"] for m in obj_data["measurements"] if m["elementName"] == "Image"]
       ovr_meas = [m["elementMeasurements"] for m in obj_data["measurements"] if m["elementName"] == "Overall"]
@@ -180,7 +192,7 @@ class PaintingsUtils:
 
       obj_filtered_data = { f: obj_data[f] for f in self.OBJ_FIELDS }
 
-      obj_measurements = type(self).get_measurement(obj_data)
+      obj_measurements = self.get_measurement(obj_data)
       if obj_measurements:
         obj_filtered_data["measurements"] = obj_measurements
 
@@ -192,7 +204,7 @@ class PaintingsUtils:
         return obj_filtered_data
 
 
-  def is_done(self, obj_data):
+  def is_processed(self, obj_data):
     oid = obj_data["objectID"]
     json_face_path = f"{self.json_faces_dir}/{oid}.json"
     json_landmark_path = f"{self.json_landmarks_dir}/{oid}.json"
@@ -237,7 +249,13 @@ class PaintingsUtils:
       iw,ih = img.size
       nh = 256
       nw = int(nh * iw // ih)
-      nimg = img.resize((nw, nh))
+      center_third = (nw//3, nh//3, 2*nw//3, 2*nh//3)
+
+      nimg = img.resize((nw, nh)).convert("RGB")
+
+      pxsum = PImageStat.Stat(nimg.crop(mid_third)).sum
+      regeb = (pxsum[0] == pxsum[1]) and (pxsum[1] == pxsum[2])
+      obj_data["img_bw"] = regeb
 
       faces = self.face_detector.predict(nimg, verbose=False, device="cuda")
       if len(faces) < 1 or len(faces[0]) < 1:
@@ -317,20 +335,6 @@ class PaintingsUtils:
       with open(json_landmark_path, "w") as ofp:
         json.dump(obj_data, ofp, ensure_ascii=False)
         return obj_data
-
-
-  def get_image(self, img_url):
-    tdiff = timestamp() - self.last_req
-    if tdiff < 0.75:
-      sleep(0.75 - tdiff)
-
-    img_response = requests.get(img_url, stream=True)
-    self.last_req = timestamp()
-
-    if img_response.status_code > 399 or img_response.status_code < 200:
-      return None
-    else:
-      return PImage.open(img_response.raw)
 
 
   def get_eye_images(self, obj_data, img):
